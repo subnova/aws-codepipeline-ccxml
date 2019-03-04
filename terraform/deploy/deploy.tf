@@ -86,7 +86,7 @@ data "aws_iam_policy_document" "ccxml_role_policy" {
 
     actions = [
       "s3:PutObject",
-      "s3:PutObjectAcl"
+      "s3:PutObjectAcl",
     ]
 
     resources = [
@@ -95,15 +95,15 @@ data "aws_iam_policy_document" "ccxml_role_policy" {
   }
 
   statement {
-      effect = "Allow"
+    effect = "Allow"
 
-      actions = [
-          "logs:*"
-      ]
+    actions = [
+      "logs:*",
+    ]
 
-      resources = [
-          "*"
-      ]
+    resources = [
+      "*",
+    ]
   }
 }
 
