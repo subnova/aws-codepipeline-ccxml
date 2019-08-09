@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"context"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -41,7 +42,7 @@ func (p *AWSS3PersistenceProvider) PersistProjects(projects []Project) error {
 		Key:          &p.key,
 	})
 
-	_, err := req.Send()
+	_, err := req.Send(context.Background())
 	if err != nil {
 		return fmt.Errorf("unable to persist to S3 s3://%s/%s: %v", p.bucket, p.key, err)
 	}

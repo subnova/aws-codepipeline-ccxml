@@ -2,6 +2,7 @@ package main
 
 import (
 	"time"
+	"context"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/codepipeline"
@@ -31,7 +32,7 @@ func (p *AWSPipelineStateProvider) GetPipelineState() ([]PipelineState, error) {
 	svc := codepipeline.New(p.config)
 
 	req := svc.ListPipelinesRequest(&codepipeline.ListPipelinesInput{})
-	resp, err := req.Send()
+	resp, err := req.Send(context.Background())
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +44,7 @@ func (p *AWSPipelineStateProvider) GetPipelineState() ([]PipelineState, error) {
 			Name: pipeline.Name,
 		})
 
-		stageStates, err := req.Send()
+		stageStates, err := req.Send(context.Background())
 		if err != nil {
 			return nil, err
 		}
