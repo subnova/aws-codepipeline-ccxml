@@ -2,3 +2,5 @@
 .terraform/
 terraform.tfstate*
 aws-codepipeline-ccxml
+ccxml
+package.zip
