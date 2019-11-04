@@ -8,7 +8,7 @@ variable "key" {
 }
 
 resource "aws_s3_bucket" "ccxml" {
-  bucket = "${var.bucket}"
+  bucket = var.bucket
   acl    = "public-read"
 
   website {
@@ -17,31 +17,47 @@ resource "aws_s3_bucket" "ccxml" {
 }
 
 output "website" {
-  value = "https://${aws_s3_bucket.ccxml.website_endpoint}/${var.key}"
+  value = "http://${aws_s3_bucket.ccxml.website_endpoint}/${var.key}"
 }
 
 module "ccxml" {
   source = "howdio/lambda/aws//modules/package"
 
   name = "ccxml"
-  path = "${path.module}/aws-codepipeline-ccxml"
+  path = path.cwd
+}
+
+resource "null_resource" "cctest" {
+  provisioner "local-exec" {
+    command = "go get && GOOS=linux GOARCH=amd64 go build -o ccxml"
+  }
+  triggers = {
+    source_file = base64sha256("${path.cwd}/src/main.go")
+  }
+}
+
+data "archive_file" "lambda_zip" {
+  type        = "zip"
+  source_file = "${path.cwd}/ccxml"
+  output_path = "${path.cwd}/package.zip"
+  depends_on  = [null_resource.cctest]
 }
 
 resource "aws_lambda_function" "ccxml" {
-  filename         = "${module.ccxml.path}"
+  filename         = data.archive_file.lambda_zip.output_path
   function_name    = "ccxml"
-  handler          = "aws-codepipeline-ccxml"
+  handler          = "ccxml"
   description      = "Handler that responds to CodePipeline events by updating a CCTray XML feed"
   memory_size      = 128
   timeout          = 20
   runtime          = "go1.x"
-  source_code_hash = "${module.ccxml.base64sha256}"
-  role             = "${aws_iam_role.ccxml.arn}"
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  role             = aws_iam_role.ccxml.arn
 
   environment {
-    variables {
-      BUCKET = "${var.bucket}"
-      KEY    = "${var.key}"
+    variables = {
+      BUCKET = var.bucket
+      KEY    = var.key
     }
   }
 }
@@ -64,7 +80,7 @@ data "aws_iam_policy_document" "ccxml_assume_role_policy" {
 resource "aws_iam_role" "ccxml" {
   name = "ccxml"
 
-  assume_role_policy = "${data.aws_iam_policy_document.ccxml_assume_role_policy.json}"
+  assume_role_policy = data.aws_iam_policy_document.ccxml_assume_role_policy.json
 }
 
 data "aws_iam_policy_document" "ccxml_role_policy" {
@@ -108,9 +124,9 @@ data "aws_iam_policy_document" "ccxml_role_policy" {
 }
 
 resource "aws_iam_role_policy" "ccxml" {
-  role = "${aws_iam_role.ccxml.id}"
+  role = aws_iam_role.ccxml.id
 
-  policy = "${data.aws_iam_policy_document.ccxml_role_policy.json}"
+  policy = data.aws_iam_policy_document.ccxml_role_policy.json
 }
 
 locals {
@@ -119,26 +135,26 @@ locals {
     detail-type = ["CodePipeline Stage Execution State Change"]
   }
 
-  event_pattern_json = "${jsonencode(local.event_pattern)}"
+  event_pattern_json = jsonencode(local.event_pattern)
 }
 
 resource "aws_cloudwatch_event_rule" "ccxml" {
   name        = "ccxml"
   description = "Rule that matches CodePipeline State Execution State Changes"
 
-  event_pattern = "${local.event_pattern_json}"
+  event_pattern = local.event_pattern_json
 }
 
 resource "aws_cloudwatch_event_target" "ccxml" {
   target_id = "ccxml"
-  rule      = "${aws_cloudwatch_event_rule.ccxml.name}"
-  arn       = "${aws_lambda_function.ccxml.arn}"
+  rule      = aws_cloudwatch_event_rule.ccxml.name
+  arn       = aws_lambda_function.ccxml.arn
 }
 
 resource "aws_lambda_permission" "ccxml" {
   statement_id  = "AllowExecutionFromCloudWatch"
   action        = "lambda:InvokeFunction"
-  function_name = "${aws_lambda_function.ccxml.function_name}"
+  function_name = aws_lambda_function.ccxml.function_name
   principal     = "events.amazonaws.com"
-  source_arn    = "${aws_cloudwatch_event_rule.ccxml.arn}"
+  source_arn    = aws_cloudwatch_event_rule.ccxml.arn
 }
