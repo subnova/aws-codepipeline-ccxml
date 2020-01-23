@@ -33,6 +33,7 @@ func (p *AWSPipelineStateProvider) GetPipelineState() ([]PipelineState, error) {
 
 	req := svc.ListPipelinesRequest(&codepipeline.ListPipelinesInput{})
 	resp, err := req.Send(context.Background())
+
 	if err != nil {
 		return nil, err
 	}
